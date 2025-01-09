@@ -1,9 +1,10 @@
 # !/usr/bin/env python3
+#
 # -*- coding: utf-8 -*-
 #
 # esfa.py
 #
-# Version beta1.0
+# Version beta1.1
 #
 # This Python 3 script allows the user to extract codon sites from alignments. This was
 # created mainly to be coupled with CodeML, as a way to analyse site-by-site results in
@@ -14,12 +15,13 @@
 # list.txt
 # 
 # gene_a: 1, 2, 3, 4, 5, 6
-# gene_b: 20, 21, 22, 23, 24
+# gene_b: 20-24, 27, 29-30
 # gene_c: 123, 3, 1245, 235, 5
 # ...
 # 
 # The codon sites should be separated by a comma and a blank space, and they do not need
-# to be in order. Make sure that the gene name (for example, gene_a) corresponds with the
+# to be in order. Codon sites can also be represented as an interval, using an hyphen to
+# separate them. Make sure that the gene name (for example, gene_a) corresponds with the
 # name of the alignment file. The extension should not be included, but check if it is 
 # supported by the program. Also make sure that LF line breaks were used to separate the
 # lines in the list.
@@ -88,7 +90,17 @@ class Extraction:
                 ### Get alignment names and codon sites
                 gene_name, sites = line.split(":")
                 gene_name = gene_name.strip()
-                sites = [int(s.strip()) for s in sites.split(",")]
+                sites_list = []
+                
+                ### Check for intervals
+                for item in sites.split(","):
+                    item = item.strip()
+                    if "-" in item:
+                        start, end = map(int, item.split("-"))
+                        sites_list.extend(range(start, end + 1))
+                    else:
+                        sites_list.append(int(item))
+
                 gene_sites[gene_name] = sites
         
         return gene_sites
