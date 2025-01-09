@@ -101,7 +101,7 @@ class Extraction:
                     else:
                         sites_list.append(int(item))
 
-                gene_sites[gene_name] = sites
+                gene_sites[gene_name] = sites_list
         
         return gene_sites
     
