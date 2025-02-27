@@ -4,7 +4,7 @@
 #
 # esfa.py
 #
-# Version beta1.1
+# Version beta1.2
 #
 # This Python 3 script allows the user to extract codon sites from alignments. This was
 # created mainly to be coupled with CodeML, as a way to analyse site-by-site results in
@@ -65,6 +65,8 @@ esfa = argparse.ArgumentParser(description="This Python 3 script allows the user
 esfa.add_argument("--list", "-l", dest="input_gene_list", required=True, type=str, help="The file path to the list, in .txt format")
 
 esfa.add_argument("--dir", "-d", dest="genes_dir", required=True, type=str, help="The path to the directory containing the alignment files, in .fasta or .phy format.")
+
+esfa.add_argument("--intermerdiate", "-i", dest="intermediate_positions", required=False, action="store_true", help="Use this flag to print the intermediate positions of the concatenated alignment.")
 
 args = esfa.parse_args()
 
@@ -176,6 +178,48 @@ class Extraction:
                                           id = species,
                                           description = "Concatenated extracted sites")
                 SeqIO.write([concat_record], concat_fasta, "fasta")
+
+    def get_sites_intermediate(self, output_fasta = "SitesPerGene.fasta", concatenated_fasta = "ConcatenatedSites.fasta"):
+        """Extracts the corresponding codon sites from the desired alignments."""
+
+        species_sequences = {species: [] for species in self.all_species}
+
+        ### Get gene info
+        gene_data = {} 
+        for file_path in self.get_alignments():
+            gene_name = next(gene for gene in self.gene_sites if gene in os.path.basename(file_path))
+            sites = self.gene_sites[gene_name]
+
+            print(f"Processing sites for gene {gene_name}...")
+
+            alignment = AlignIO.read(file_path, "fasta" if file_path.endswith(".fasta") else "phylip")
+            alignment_dict = {record.id: str(record.seq) for record in alignment}
+
+            ### For each species, make sure there is a sequence
+            for species in self.all_species:
+                if species not in alignment_dict:
+                    alignment_dict[species] = "-" * len(alignment[0].seq)   ### Fill missing taxa columns with gaps
+            
+            ### Store site info
+            gene_data[gene_name] = alignment_dict
+
+        for species in self.all_species:
+            concatenated_seq = []
+            for gene_name, alignment_dict in gene_data.items():
+                seq = alignment_dict.get(species, "-" * len(alignment_dict[next(iter(alignment_dict))]))    ### Fill missing taxa columns with gaps
+                extracted_seq = ["-"] * (len(self.gene_sites[gene_name]) * 3)
+                for idx, site in enumerate(self.gene_sites[gene_name]):
+                    codon_start = (site - 1) * 3
+                    codon = seq[codon_start:codon_start + 3]
+                    extracted_seq[idx * 3: (idx + 1) * 3] = str(codon)
+                concatenated_seq.append("".join(extracted_seq)) 
+
+            ### Write concat FASTA
+            with open(concatenated_fasta, "a") as concat_fasta:
+                concat_record = SeqRecord(Seq("".join(concatenated_seq)),
+                                          id = species,
+                                          description = "Concatenated extracted sites")
+                SeqIO.write([concat_record], concat_fasta, "fasta")
         
         ### Write intermediate FASTA
         with open(output_fasta, "w") as out_fasta:
@@ -196,5 +240,9 @@ class Extraction:
 if __name__ == "__main__":
     ### Extraction
     extraction = Extraction(args.input_gene_list, args.genes_dir)
-    extraction.get_sites()
-    print(f"Extraction complete. Data saved to SitesPerGene.fasta and ConcatenatedSites.fasta")
+    if args.intermediate_positions:
+        extraction.get_sites_intermediate()
+        print(f"Extraction complete. Data saved to SitesPerGene.fasta and ConcatenatedSites.fasta")
+    else:
+        extraction.get_sites()
+        print(f"Extraction complete. Data saved to ConcatenatedSites.fasta")
